@@ -1,47 +1,45 @@
 import { Controller } from '@nestjs/common';
-import { GrpcMethod, RpcException } from '@nestjs/microservices';
-import { status } from '@grpc/grpc-js';
+import { GrpcMethod } from '@nestjs/microservices';
 import { Observable } from 'rxjs';
+import { AppService } from './app.service.js';
+import type { ProductoResponse } from './app.service.js';
 
 interface ProductoRequest { id: number; }
-interface ProductoResponse { id: number; nombre: string; precio: number; }
 interface FiltroPrecioRequest { precioMaximo: number; }
 
 @Controller()
 export class AppController {
-  private readonly productos: ProductoResponse[] = [
-    { id: 1, nombre: 'Teclado mecánico', precio: 45.90 },
-    { id: 2, nombre: 'Mouse inalámbrico', precio: 19.50 },
-    { id: 3, nombre: 'Monitor 24"', precio: 129.99 },
-  ];
+  constructor(private readonly appService: AppService) {}
 
   @GrpcMethod('ProductoService', 'ObtenerProducto')
   obtenerProducto(data: ProductoRequest): ProductoResponse {
-    const producto = this.productos.find((p) => p.id === data.id);
-    if (!producto) {
-      throw new RpcException({ code: status.NOT_FOUND, message: `Producto ${data.id} no existe` });
-    }
-    return producto;
+    return this.appService.obtenerProducto(data.id);
   }
 
   @GrpcMethod('ProductoService', 'ListarProductos')
   listarProductos(): Observable<ProductoResponse> {
+    const productos = this.appService.listarProductos();
+    
     return new Observable((subscriber) => {
       let i = 0;
       const interval = setInterval(() => {
-        subscriber.next(this.productos[i]);
-        i++;
-        if (i >= this.productos.length) {
+        if (i < productos.length) {
+          subscriber.next(productos[i]);
+          i++;
+        } else {
           clearInterval(interval);
           subscriber.complete();
         }
       }, 300);
+
+      // Teardown logic: limpia el timer si el cliente cancela la conexión
+      return () => clearInterval(interval);
     });
   }
 
   @GrpcMethod('ProductoService', 'BuscarPorPrecioMaximo')
   buscarPorPrecioMaximo(data: FiltroPrecioRequest): Observable<ProductoResponse> {
-    const productosFiltrados = this.productos.filter((p) => p.precio <= data.precioMaximo);
+    const productosFiltrados = this.appService.buscarPorPrecioMaximo(data.precioMaximo);
     
     return new Observable((subscriber) => {
       let i = 0;
@@ -51,13 +49,17 @@ export class AppController {
       }
       
       const interval = setInterval(() => {
-        subscriber.next(productosFiltrados[i]);
-        i++;
-        if (i >= productosFiltrados.length) {
+        if (i < productosFiltrados.length) {
+          subscriber.next(productosFiltrados[i]);
+          i++;
+        } else {
           clearInterval(interval);
           subscriber.complete();
         }
       }, 300);
+
+      // Teardown logic: limpia el timer si el cliente cancela la conexión
+      return () => clearInterval(interval);
     });
   }
 }
