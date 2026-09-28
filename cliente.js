@@ -25,7 +25,7 @@ client.obtenerProducto({ id: 1 }, (err, producto) => {
     call.on('data', (p) => {
         console.log(`${p.id} - ${p.nombre} - $${p.precio}  (llegó en streaming)`);
     });
-    call.on('end', () => console.log('Streaming finalizado.'));
+    call.on('end', () => console.log('\nStreaming finalizado.'));
     call.on('error', (err) => console.error('Error en el stream:', err.code, err.details));
 
     console.log('\n== Prueba de error (id inexistente) ==');
